@@ -1,0 +1,47 @@
+# Environment
+.env
+*.env
+
+# Database
+*.db
+*.db-shm
+*.db-wal
+server_settings.db
+backups.db
+message_archive.db
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Bot data
+bot_data.json
+bot_stats.json
+command_logs.json
+visitors.json
+commands_data.json
+server_url2.txt
+dashboard_cmd.txt
+
+# Node
+node_modules/

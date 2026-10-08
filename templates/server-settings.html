@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token }}">
+    <title>إعدادات السيرفر - MAX BOT</title>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --primary: #6366f1; --primary-l: #818cf8; --primary-d: #4f46e5;
+            --accent: #a78bfa; --green: #10b981; --green-l: #34d399;
+            --yellow: #f59e0b; --red: #ef4444; --red-l: #f87171;
+            --bg: #060a13; --bg2: #0c1220; --bg3: #131b2e; --bg4: #1e293b;
+            --text: #f1f5f9; --text2: #94a3b8; --text3: #64748b;
+            --border: rgba(255, 255, 255, 0.06);
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Cairo', sans-serif; }
+        body { background: var(--bg); color: var(--text); min-height: 100vh; }
+        .topbar { background: rgba(6,10,19,0.85); backdrop-filter: blur(30px); padding: 0 32px;
+            display: flex; justify-content: space-between; align-items: center;
+            border-bottom: 1px solid var(--border); height: 72px; position: sticky; top: 0; z-index: 100; }
+        .topbar .logo { display: flex; align-items: center; gap: 12px; font-size: 22px; font-weight: 900; text-decoration: none; color: var(--text); }
+        .topbar .logo i { font-size: 28px; background: linear-gradient(135deg, var(--primary), var(--accent)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .topbar .user { display: flex; align-items: center; gap: 16px; }
+        .topbar .user img { width: 40px; height: 40px; border-radius: 50%; border: 2px solid var(--primary); }
+        .topbar .user .logout { color: var(--red-l); font-size: 13px; text-decoration: none; padding: 8px 16px; border-radius: 10px; border: 1px solid rgba(248,113,113,0.2); background: rgba(248,113,113,0.05); }
+        .main { padding: 28px 32px; max-width: 1200px; margin: 0 auto; }
+        .guild-selector { background: var(--bg2); border: 1px solid var(--border); border-radius: 16px; padding: 20px; margin-bottom: 24px; display: flex; align-items: center; gap: 16px; }
+        .guild-selector select { flex: 1; padding: 12px 16px; background: var(--bg3); border: 1px solid var(--border); border-radius: 10px; color: var(--text); font-family: 'Cairo', sans-serif; font-size: 15px; cursor: pointer; }
+        .sync-btn { padding: 12px 20px; background: linear-gradient(135deg, var(--primary), var(--accent)); color: white; border: none; border-radius: 10px; cursor: pointer; font-family: 'Cairo', sans-serif; font-size: 14px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+        .status-bar { display: flex; gap: 16px; margin-bottom: 24px; flex-wrap: wrap; }
+        .status-item { background: var(--bg2); border: 1px solid var(--border); border-radius: 12px; padding: 12px 20px; display: flex; align-items: center; gap: 10px; font-size: 14px; }
+        .status-dot { width: 10px; height: 10px; border-radius: 50%; }
+        .status-dot.online { background: var(--green); box-shadow: 0 0 10px rgba(16,185,129,0.5); }
+        .status-dot.offline { background: var(--red); box-shadow: 0 0 10px rgba(239,68,68,0.5); }
+        .status-dot.warning { background: var(--yellow); box-shadow: 0 0 10px rgba(245,158,11,0.5); }
+        .settings-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 20px; }
+        .settings-card { background: var(--bg2); border: 1px solid var(--border); border-radius: 16px; padding: 24px; }
+        .settings-card h3 { color: var(--primary-l); margin-bottom: 20px; display: flex; align-items: center; gap: 10px; font-size: 17px; padding-bottom: 15px; border-bottom: 1px solid var(--border); }
+        .setting-row { margin-bottom: 16px; }
+        .setting-row label { display: block; font-weight: 600; font-size: 14px; color: var(--text2); margin-bottom: 8px; }
+        .setting-row select { width: 100%; padding: 10px 14px; background: var(--bg3); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-family: 'Cairo', sans-serif; font-size: 14px; cursor: pointer; }
+        .setting-row .hint { font-size: 12px; color: var(--text3); margin-top: 5px; }
+        .toggle-row { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--border); }
+        .toggle-row:last-child { border-bottom: none; }
+        .toggle-label { font-weight: 600; font-size: 14px; }
+        .toggle-desc { font-size: 12px; color: var(--text3); margin-top: 3px; }
+        .toggle { position: relative; width: 46px; height: 24px; flex-shrink: 0; }
+        .toggle input { opacity: 0; width: 0; height: 0; }
+        .toggle .slider { position: absolute; cursor: pointer; inset: 0; background: var(--bg4); border-radius: 24px; transition: 0.3s; }
+        .toggle .slider::before { content: ''; position: absolute; width: 18px; height: 18px; right: 3px; bottom: 3px; background: white; border-radius: 50%; transition: 0.3s; }
+        .toggle input:checked + .slider { background: var(--primary); }
+        .toggle input:checked + .slider::before { transform: translateX(-22px); }
+        .save-section { margin-top: 24px; display: flex; gap: 16px; align-items: center; position: sticky; bottom: 20px; background: var(--bg2); padding: 16px; border-radius: 12px; border: 1px solid var(--border); }
+        .save-btn { padding: 14px 40px; background: linear-gradient(135deg, var(--primary), var(--accent)); color: white; border: none; border-radius: 12px; cursor: pointer; font-family: 'Cairo', sans-serif; font-size: 16px; font-weight: 700; display: flex; align-items: center; gap: 10px; }
+        .save-btn:hover { transform: translateY(-2px); box-shadow: 0 10px 30px rgba(99,102,241,0.4); }
+        .save-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+        .toast { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); padding: 14px 28px; border-radius: 12px; color: #fff; font-weight: 700; font-size: 14px; display: none; z-index: 1000; animation: slideDown 0.3s ease; }
+        .toast.success { background: var(--green); }
+        .toast.error { background: var(--red); }
+        @keyframes slideDown { from { opacity: 0; transform: translate(-50%, -20px); } to { opacity: 1; transform: translate(-50%, 0); } }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .loading { display: inline-block; width: 20px; height: 20px; border: 2px solid rgba(255,255,255,0.3); border-radius: 50%; border-top-color: #fff; animation: spin 0.8s linear infinite; }
+        .empty-state { text-align: center; padding: 60px 20px; color: var(--text3); }
+        .empty-state i { font-size: 48px; display: block; margin-bottom: 16px; opacity: 0.5; }
+        .empty-state p { font-size: 16px; }
+        .unsaved-indicator { display: none; color: var(--yellow); font-size: 13px; font-weight: 600; }
+        .unsaved-indicator.show { display: block; }
+        .bot-invite-btn { padding: 12px 20px; background: linear-gradient(135deg, #5865F2, #7289DA); color: white; border: none; border-radius: 10px; cursor: pointer; font-family: 'Cairo', sans-serif; font-size: 14px; font-weight: 700; display: flex; align-items: center; gap: 8px; text-decoration: none; }
+        @media (max-width: 768px) { .main { padding: 16px; } .settings-grid { grid-template-columns: 1fr; } .guild-selector { flex-direction: column; align-items: stretch; } }
+    </style>
+</head>
+<body>
+    <div class="topbar">
+        <a href="/dashboard" class="logo"><i class="fas fa-rocket"></i><span>MAX <span style="color: var(--accent)">BOT</span></span></a>
+        <div class="user">
+            <a href="/logout" class="logout"><i class="fas fa-sign-out-alt"></i> خروج</a>
+            {% if avatar %}<img src="{{ avatar }}" alt="">{% endif %}
+            <span>{{ username }}</span>
+        </div>
+    </div>
+    <div class="main">
+        <div class="guild-selector">
+            <label><i class="fas fa-server"></i> اختر السيرفر:</label>
+            <select id="guildSelect"><option value="">-- اختر سيرفر --</option></select>
+            <button class="sync-btn" onclick="syncDiscord()"><i class="fas fa-sync"></i> مزامنة</button>
+        </div>
+        <div class="status-bar" id="statusBar" style="display: none;">
+            <div class="status-item"><span class="status-dot online" id="botStatusDot"></span><span id="botStatusText">البوت متصل</span></div>
+            <div class="status-item"><i class="fas fa-users" style="color: var(--primary-l);"></i><span id="memberCount">0 عضو</span></div>
+            <div class="status-item"><i class="fas fa-clock" style="color: var(--yellow);"></i><span id="lastUpdate">آخر تحديث: —</span></div>
+        </div>
+        <div id="settingsContainer" style="display: none;">
+            <div class="settings-grid">
+                <div class="settings-card">
+                    <h3><i class="fas fa-users-cog"></i> الرتب والصلاحيات</h3>
+                    <div class="setting-row"><label>رتبة الأدمن</label><select id="admin_role_id"><option value="">-- اختر الرتبة --</option></select><p class="hint">الرتبة اللي تستخدم أوامر الأدمن</p></div>
+                    <div class="setting-row"><label>رتبة التيكت</label><select id="ticket_role_id"><option value="">-- اختر الرتبة --</option></select><p class="hint">الرتبة اللي تستطيع فتح تذاكر</p></div>
+                    <div class="setting-row"><label>رتبة مدير التيكت</label><select id="ticket_manager_role_id"><option value="">-- اختر الرتبة --</option></select><p class="hint">الرتبة اللي تدير التذاكر</p></div>
+                    <div class="setting-row"><label>رتبة عالية</label><select id="high_role_id"><option value="">-- اختر الرتبة --</option></select><p class="hint">الرتبة اللي تُعتبر عالية</p></div>
+                    <div class="setting-row"><label>رتبة تلقائية</label><select id="auto_role_id"><option value="">-- اختر الرتبة --</option></select><p class="hint">الرتبة اللي تُعطى تلقائياً عند الانضمام</p></div>
+                </div>
+                <div class="settings-card">
+                    <h3><i class="fas fa-hashtag"></i> القنوات</h3>
+                    <div class="setting-row"><label>قناة اللوق الرئيسية</label><select id="log_channel_id"><option value="">-- اختر القناة --</option></select><p class="hint">القناة اللي تُرسل فيها رسائل اللوق</p></div>
+                    <div class="setting-row"><label>قناة الترحيب</label><select id="welcome_channel_id"><option value="">-- اختر القناة --</option></select><p class="hint">القناة اللي يُرسل فيها رسالة الترحيب</p></div>
+                </div>
+                <div class="settings-card">
+                    <h3><i class="fas fa-ticket-alt"></i> التذاكر</h3>
+                    <div class="setting-row"><label>تصنيف التيكت</label><select id="ticket_category_id"><option value="">-- اختر التصنيف --</option></select><p class="hint">التصنيف اللي تُفتح فيه التذاكر</p></div>
+                </div>
+                <div class="settings-card">
+                    <h3><i class="fas fa-shield-alt"></i> الحماية</h3>
+                    <div class="toggle-row"><div><div class="toggle-label">حماية السبام</div><div class="toggle-desc">كشف وحظر السبام</div></div><label class="toggle"><input type="checkbox" id="spam_enabled" checked><span class="slider"></span></label></div>
+                    <div class="toggle-row"><div><div class="toggle-label">حماية الفلود</div><div class="toggle-desc">كشف الرسائل المتكررة</div></div><label class="toggle"><input type="checkbox" id="flood_enabled" checked><span class="slider"></span></label></div>
+                    <div class="toggle-row"><div><div class="toggle-label">حماية المنشن</div><div class="toggle-desc">كشف المنشن الجماعي</div></div><label class="toggle"><input type="checkbox" id="mention_enabled" checked><span class="slider"></span></label></div>
+                    <div class="toggle-row"><div><div class="toggle-label">حماية الروابط</div><div class="toggle-desc">كشف روابط السيرفرات الأخرى</div></div><label class="toggle"><input type="checkbox" id="invite_enabled" checked><span class="slider"></span></label></div>
+                    <div class="toggle-row"><div><div class="toggle-label">حماية الكلمات</div><div class="toggle-desc">كشف الكلمات الممنوعة</div></div><label class="toggle"><input type="checkbox" id="badwords_enabled" checked><span class="slider"></span></label></div>
+                </div>
+                <div class="settings-card">
+                    <h3><i class="fas fa-bell"></i> الإشعارات</h3>
+                    <div class="toggle-row"><div><div class="toggle-label">إشعار الدخول</div><div class="toggle-desc">رسالة عند دخول عضو جديد</div></div><label class="toggle"><input type="checkbox" id="join_notification" checked><span class="slider"></span></label></div>
+                    <div class="toggle-row"><div><div class="toggle-label">إشعار الخروج</div><div class="toggle-desc">رسالة عند خروج عضو</div></div><label class="toggle"><input type="checkbox" id="leave_notification"><span class="slider"></span></label></div>
+                </div>
+            </div>
+            <div class="save-section">
+                <button class="save-btn" id="saveBtn" onclick="saveSettings()"><i class="fas fa-save"></i> حفظ الإعدادات</button>
+                <span class="unsaved-indicator" id="unsavedIndicator">⚠️ لديك تغييرات غير محفوظة</span>
+                <span id="saveStatus" style="color: var(--text3); font-size: 14px;"></span>
+            </div>
+        </div>
+        <div class="empty-state" id="emptyState"><i class="fas fa-server"></i><p>اختر سيرفر من القائمة أعلاه لعرض الإعدادات</p></div>
+    </div>
+    <div class="toast" id="toast"></div>
+    <script>
+        let currentGuildId = null, guilds = [], roles = [], channels = [], categories = [];
+        let hasUnsavedChanges = false;
+
+        // CSRF Token
+        const csrfToken = document.querySelector('meta[name="csrf-token"]').content;
+
+        // تحميل السيرفرات
+        async function loadGuilds() {
+            try {
+                const res = await fetch('/api/guilds');
+                const data = await res.json();
+                if (data.ok) {
+                    guilds = data.guilds;
+                    const select = document.getElementById('guildSelect');
+                    select.innerHTML = '<option value="">-- اختر سيرفر --</option>';
+                    guilds.forEach(g => {
+                        const o = document.createElement('option');
+                        o.value = g.id;
+                        o.textContent = g.name + (g.bot_installed ? '' : ' (البوت غير مثبت)');
+                        select.appendChild(o);
+                    });
+                }
+            } catch (e) { console.error('Error loading guilds:', e); }
+        }
+
+        // تحميل الإعدادات - ترتيب صحيح
+        async function loadSettings(guildId) {
+            if (!guildId) {
+                document.getElementById('settingsContainer').style.display = 'none';
+                document.getElementById('emptyState').style.display = 'block';
+                document.getElementById('statusBar').style.display = 'none';
+                return;
+            }
+
+            currentGuildId = guildId;
+            document.getElementById('emptyState').style.display = 'none';
+            document.getElementById('settingsContainer').style.display = 'block';
+            document.getElementById('statusBar').style.display = 'flex';
+
+            // مسح الحقول أولاً
+            clearAllFields();
+
+            // تحميل الرتب والقنوات أولاً (متسلسل)
+            await loadRoles(guildId);
+            await loadChannels(guildId);
+            // ثم تحميل الإعدادات المحفوظة
+            await loadSettingsData(guildId);
+        }
+
+        function clearAllFields() {
+            ['admin_role_id', 'ticket_role_id', 'ticket_manager_role_id', 'high_role_id',
+             'auto_role_id', 'log_channel_id', 'welcome_channel_id', 'ticket_category_id'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.innerHTML = '<option value="">-- اختر --</option>';
+            });
+            ['spam_enabled', 'flood_enabled', 'mention_enabled', 'invite_enabled',
+             'badwords_enabled', 'join_notification'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.checked = true;
+            });
+            const leave = document.getElementById('leave_notification');
+            if (leave) leave.checked = false;
+            hasUnsavedChanges = false;
+            updateUnsavedIndicator();
+        }
+
+        async function loadRoles(guildId) {
+            try {
+                const res = await fetch(`/api/guild-roles?guild_id=${guildId}`);
+                const data = await res.json();
+                if (data.ok) {
+                    roles = data.roles;
+                    populateSelect('admin_role_id', roles);
+                    populateSelect('ticket_role_id', roles);
+                    populateSelect('ticket_manager_role_id', roles);
+                    populateSelect('high_role_id', roles);
+                    populateSelect('auto_role_id', roles);
+                }
+            } catch (e) { console.error('Error loading roles:', e); }
+        }
+
+        async function loadChannels(guildId) {
+            try {
+                const res = await fetch(`/api/guild-channels?guild_id=${guildId}`);
+                const data = await res.json();
+                if (data.ok) {
+                    channels = data.text_channels;
+                    categories = data.categories;
+                    populateSelect('log_channel_id', channels);
+                    populateSelect('welcome_channel_id', channels);
+                    populateSelect('ticket_category_id', categories);
+                }
+            } catch (e) { console.error('Error loading channels:', e); }
+        }
+
+        async function loadSettingsData(guildId) {
+            try {
+                const res = await fetch(`/api/server-settings?guild_id=${guildId}`);
+                const data = await res.json();
+                if (data.ok) {
+                    const s = data.settings;
+                    // تحويل القيم النصية إلى أرقام للـ select
+                    setSelectValue('admin_role_id', s.admin_role_id);
+                    setSelectValue('ticket_role_id', s.ticket_role_id);
+                    setSelectValue('ticket_manager_role_id', s.ticket_manager_role_id);
+                    setSelectValue('high_role_id', s.high_role_id);
+                    setSelectValue('auto_role_id', s.auto_role_id);
+                    setSelectValue('log_channel_id', s.log_channel_id);
+                    setSelectValue('welcome_channel_id', s.welcome_channel_id);
+                    setSelectValue('ticket_category_id', s.ticket_category_id);
+                    // تحويل صريح لـ boolean
+                    document.getElementById('spam_enabled').checked = Boolean(Number(s.spam_enabled));
+                    document.getElementById('flood_enabled').checked = Boolean(Number(s.flood_enabled));
+                    document.getElementById('mention_enabled').checked = Boolean(Number(s.mention_enabled));
+                    document.getElementById('invite_enabled').checked = Boolean(Number(s.invite_enabled));
+                    document.getElementById('badwords_enabled').checked = Boolean(Number(s.badwords_enabled));
+                    document.getElementById('join_notification').checked = Boolean(Number(s.join_notification));
+                    document.getElementById('leave_notification').checked = Boolean(Number(s.leave_notification));
+                    document.getElementById('lastUpdate').textContent = 'آخر تحديث: ' + (s.updated_at || '—');
+                }
+            } catch (e) { console.error('Error loading settings:', e); }
+        }
+
+        function populateSelect(selectId, items) {
+            const select = document.getElementById(selectId);
+            select.innerHTML = '<option value="">-- اختر --</option>';
+            items.forEach(item => {
+                const o = document.createElement('option');
+                o.value = item.id;
+                o.textContent = item.name;
+                select.appendChild(o);
+            });
+        }
+
+        function setSelectValue(selectId, value) {
+            if (value) {
+                const el = document.getElementById(selectId);
+                if (el) el.value = String(value);
+            }
+        }
+
+        async function saveSettings() {
+            if (!currentGuildId) { showToast('اختر سيرفر أولاً', 'error'); return; }
+            const btn = document.getElementById('saveBtn');
+            btn.disabled = true;
+            btn.innerHTML = '<span class="loading"></span> جاري الحفظ...';
+            const settings = {
+                guild_id: currentGuildId,
+                guild_name: guilds.find(g => g.id === currentGuildId)?.name || '',
+                admin_role_id: document.getElementById('admin_role_id').value,
+                ticket_role_id: document.getElementById('ticket_role_id').value,
+                ticket_manager_role_id: document.getElementById('ticket_manager_role_id').value,
+                high_role_id: document.getElementById('high_role_id').value,
+                auto_role_id: document.getElementById('auto_role_id').value,
+                log_channel_id: document.getElementById('log_channel_id').value,
+                welcome_channel_id: document.getElementById('welcome_channel_id').value,
+                ticket_category_id: document.getElementById('ticket_category_id').value,
+                spam_enabled: document.getElementById('spam_enabled').checked,
+                flood_enabled: document.getElementById('flood_enabled').checked,
+                mention_enabled: document.getElementById('mention_enabled').checked,
+                invite_enabled: document.getElementById('invite_enabled').checked,
+                badwords_enabled: document.getElementById('badwords_enabled').checked,
+                join_notification: document.getElementById('join_notification').checked,
+                leave_notification: document.getElementById('leave_notification').checked
+            };
+            try {
+                const res = await fetch('/api/server-settings', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
+                    body: JSON.stringify(settings)
+                });
+                const data = await res.json();
+                if (data.ok) {
+                    showToast('✅ تم حفظ الإعدادات بنجاح', 'success');
+                    document.getElementById('saveStatus').textContent = 'تم الحفظ بنجاح';
+                    hasUnsavedChanges = false;
+                    updateUnsavedIndicator();
+                } else {
+                    showToast('❌ ' + (data.error || 'فشل الحفظ'), 'error');
+                    document.getElementById('saveStatus').textContent = 'فشل الحفظ';
+                }
+            } catch (e) { showToast('❌ خطأ في الاتصال', 'error'); }
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-save"></i> حفظ الإعدادات';
+        }
+
+        async function syncDiscord() {
+            if (!currentGuildId) { showToast('اختر سيرفر أولاً', 'error'); return; }
+            showToast('🔄 جاري المزامنة...', 'success');
+            await Promise.all([loadRoles(currentGuildId), loadChannels(currentGuildId)]);
+            showToast('✅ تم المزامنة بنجاح', 'success');
+        }
+
+        function showToast(message, type) {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.className = 'toast ' + type;
+            toast.style.display = 'block';
+            setTimeout(() => { toast.style.display = 'none'; }, 3000);
+        }
+
+        function updateUnsavedIndicator() {
+            const el = document.getElementById('unsavedIndicator');
+            if (el) el.classList.toggle('show', hasUnsavedChanges);
+        }
+
+        // مراقبة التغييرات
+        document.addEventListener('change', (e) => {
+            if (e.target.id && (e.target.id.endsWith('_id') || e.target.id.endsWith('_enabled') || e.target.id.endsWith('_notification'))) {
+                hasUnsavedChanges = true;
+                updateUnsavedIndicator();
+            }
+        });
+
+        // تحذير قبل المغادرة
+        window.addEventListener('beforeunload', (e) => {
+            if (hasUnsavedChanges) {
+                e.preventDefault();
+                e.returnValue = '';
+            }
+        });
+
+        document.getElementById('guildSelect').addEventListener('change', (e) => { loadSettings(e.target.value); });
+        loadGuilds();
+    </script>
+</body>
+</html>
