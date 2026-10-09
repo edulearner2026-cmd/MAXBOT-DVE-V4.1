@@ -683,59 +683,71 @@ async def _after_ready():
                         await ch.connect()
                 except:
                     pass
-    for g in bot.guilds:
+    # منع جميع عمليات التهيئة المتكررة عند إعادة التشغيل - مرة واحدة فقط
+    import os
+    sync_flag = "/tmp/.bot_initialized"
+    if not os.path.exists(sync_flag):
+        for g in bot.guilds:
+            try:
+                await bot.tree.sync(guild=g)
+                print(f"[STARTUP] ✅ Guild tree synced for {g.name}", flush=True)
+            except Exception as e:
+                print(f"[STARTUP] ❌ Guild sync failed for {g.name}: {e}", flush=True)
         try:
-            await bot.tree.sync(guild=g)
-            print(f"[STARTUP] ✅ Guild tree synced for {g.name}", flush=True)
+            synced = await bot.tree.sync()
+            print(f"[STARTUP] ✅ Global tree synced — {len(synced)} commands", flush=True)
         except Exception as e:
-            print(f"[STARTUP] ❌ Guild sync failed for {g.name}: {e}", flush=True)
-    try:
-        synced = await bot.tree.sync()
-        print(f"[STARTUP] ✅ Global tree synced — {len(synced)} commands", flush=True)
-    except Exception as e:
-        print(f"[STARTUP] ❌ Global tree sync failed: {e}", flush=True)
-    try:
-        export_commands_to_json()
-    except Exception as e:
-        print(f"[EXPORT COMMANDS ERROR] {e}", flush=True)
-    renamed_total = 0
-    topics_updated = 0
-    for guild in bot.guilds:
-        config = log_channels.get(guild.id)
-        if not config:
-            continue
-        for key, new_name in LOG_CHANNEL_NAMES.items():
-            ch_id = config.get(key)
-            if ch_id:
-                ch = guild.get_channel(ch_id)
-                if ch:
-                    if ch.name != new_name:
-                        try:
-                            await ch.edit(name=new_name)
-                            renamed_total += 1
-                            await asyncio.sleep(0.3)
-                        except:
-                            pass
-                    new_topic = LOG_CHANNEL_TOPICS.get(key)
-                    if new_topic and ch.topic != new_topic:
-                        try:
-                            await ch.edit(topic=new_topic)
-                            topics_updated += 1
-                            await asyncio.sleep(0.3)
-                        except:
-                            pass
-    if renamed_total:
-        print(f"[AUTO-RENAME] Renamed {renamed_total} log channels to new format")
-    if topics_updated:
-        print(f"[AUTO-TOPIC] Updated {topics_updated} log channel topics")
+            print(f"[STARTUP] ❌ Global tree sync failed: {e}", flush=True)
+        try:
+            with open(sync_flag, "w") as f:
+                f.write("1")
+        except Exception:
+            pass
+    else:
+        print("[STARTUP] ⏭️ Already initialized, skipping ALL setup operations", flush=True)
+    if not os.path.exists(sync_flag):
+        try:
+            export_commands_to_json()
+        except Exception as e:
+            print(f"[EXPORT COMMANDS ERROR] {e}", flush=True)
+        renamed_total = 0
+        topics_updated = 0
+        for guild in bot.guilds:
+            config = log_channels.get(guild.id)
+            if not config:
+                continue
+            for key, new_name in LOG_CHANNEL_NAMES.items():
+                ch_id = config.get(key)
+                if ch_id:
+                    ch = guild.get_channel(ch_id)
+                    if ch:
+                        if ch.name != new_name:
+                            try:
+                                await ch.edit(name=new_name)
+                                renamed_total += 1
+                                await asyncio.sleep(0.3)
+                            except:
+                                pass
+                        new_topic = LOG_CHANNEL_TOPICS.get(key)
+                        if new_topic and ch.topic != new_topic:
+                            try:
+                                await ch.edit(topic=new_topic)
+                                topics_updated += 1
+                                await asyncio.sleep(0.3)
+                            except:
+                                pass
+        if renamed_total:
+            print(f"[AUTO-RENAME] Renamed {renamed_total} log channels to new format")
+        if topics_updated:
+            print(f"[AUTO-TOPIC] Updated {topics_updated} log channel topics")
 
-    # Start username hunter task if it was active
-    if username_hunter_data.get("active") and username_hunter_data.get("channel_id"):
-        try:
-            username_hunter_task.start()
-            print(f"[HUNTER] Username hunter task started (channel: {username_hunter_data['channel_id']})", flush=True)
-        except Exception as e:
-            print(f"[HUNTER] Could not start task: {e}", flush=True)
+        # Start username hunter task if it was active
+        if username_hunter_data.get("active") and username_hunter_data.get("channel_id"):
+            try:
+                username_hunter_task.start()
+                print(f"[HUNTER] Username hunter task started (channel: {username_hunter_data['channel_id']})", flush=True)
+            except Exception as e:
+                print(f"[HUNTER] Could not start task: {e}", flush=True)
 
 async def send_error_to_owner(error_name, error_msg, ctx_str="", guild_str="", user_str=""):
     try:
