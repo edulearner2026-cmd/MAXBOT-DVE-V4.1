@@ -497,7 +497,17 @@ async def get_log_ch(guild_id, log_type="main"):
             return ch
     return None
 
+_audit_log_cooldown = {}
+
 async def get_admin(guild, action_type, target_id):
+    now = time.time()
+    key = (guild.id, action_type.value, target_id)
+    
+    if key in _audit_log_cooldown and (now - _audit_log_cooldown[key] < 5):
+        return None
+        
+    _audit_log_cooldown[key] = now
+    
     try:
         async for entry in guild.audit_logs(limit=5, action=action_type):
             if entry.target and entry.target.id == target_id:
@@ -4917,6 +4927,24 @@ WEBHOOK_LOG_CHANNELS = {
     "log_hacker":      "💻 ∙ WEBHOOK ∙ H.A.C.K.E.R",
 }
 
+async def _get_or_create_log_channel(guild, category, key, channel_name):
+    """جلب قناة اللوق بالأيدي، أو بالاسم إذا كان الأيدي يساوي 0"""
+    guild_logs = log_channels.get(guild.id, {})
+    ch_id = guild_logs.get(key, 0)
+    channel = guild.get_channel(ch_id) if ch_id else None
+
+    # Fallback: إذا لم نجد القناة بالـ ID، نبحث بالاسم لمنع الإنشاء المكرر
+    if not channel:
+        channel = discord.utils.get(category.text_channels, name=channel_name)
+        if channel:
+            if guild.id not in log_channels:
+                log_channels[guild.id] = {}
+            log_channels[guild.id][key] = channel.id
+            save_data()
+
+    return channel
+
+
 async def _create_log_channels(ctx):
     """إنشاء رومات اللوق - 11 روم احترافية"""
     guild = ctx.guild
@@ -4951,6 +4979,11 @@ async def _create_log_channels(ctx):
         topic = LOG_CHANNEL_TOPICS.get(key, "")
         for attempt in range(3):
             try:
+                ch = await _get_or_create_log_channel(guild, category, key, channel_name)
+                if ch:
+                    created_channels[key] = ch.id
+                    done += 1
+                    break
                 ch = await guild.create_text_channel(name=channel_name, category=category, slowmode_delay=0, topic=topic)
                 created_channels[key] = ch.id
                 done += 1
@@ -5006,31 +5039,38 @@ async def log(ctx):
     """!log - إعداد رومات اللوق"""
     guild = ctx.guild
 
-    if guild.id in log_channels:
-        del log_channels[guild.id]
-
+    # تحقق من وجود رومات لوق مسبقاً
     existing = discord.utils.get(guild.categories, name=LOG_CATEGORY_NAME)
-    if existing:
-        msg2 = await ctx.send("⏳ **جاري حذف القنوات القديمة...**")
-        count = 0
-        for ch in list(existing.channels):
-            try:
-                await ch.delete()
-                count += 1
-            except:
-                pass
-            await asyncio.sleep(0.5)
-        try:
-            await existing.delete()
-        except:
-            pass
-        try:
-            await msg2.edit(content=f"✅ تم حذف {count} قناة قديمة")
-        except:
-            pass
-        await asyncio.sleep(2)
+    if existing and len(existing.channels) >= 5:
+        await ctx.send("✅ رومات اللوق موجودة مسبقاً! استخدم `!log reset` إذا أردت إعادة إنشائها.")
+        return
+
+    if not existing:
+        # إنشاء فئة جديدة فقط إذا لم تكن موجودة
+        pass
+    else:
+        # الفئة موجودة لكن القنوات ناقصة - أكمل الناقص فقط
+        pass
 
     await _create_log_channels(ctx)
+
+class ConfirmResetView(discord.ui.View):
+    def __init__(self, timeout=30):
+        super().__init__(timeout=timeout)
+        self.value = None
+
+    @discord.ui.button(label="تأكيد الحذف", style=discord.ButtonStyle.danger)
+    async def confirm(self, interaction: discord.Interaction, button: discord.ui.Button):
+        self.value = True
+        self.stop()
+        await interaction.response.send_message("جاري حذف رومات اللوق...", ephemeral=True)
+
+    @discord.ui.button(label="إلغاء", style=discord.ButtonStyle.secondary)
+    async def cancel(self, interaction: discord.Interaction, button: discord.ui.Button):
+        self.value = False
+        self.stop()
+        await interaction.response.send_message("تم إلغاء العملية.", ephemeral=True)
+
 
 @log.command(name="reset")
 @commands.has_permissions(administrator=True)
@@ -5038,14 +5078,31 @@ async def log_reset(ctx):
     """حذف كاتقوري LOG وإعادة إنشائها"""
     guild = ctx.guild
     existing = discord.utils.get(guild.categories, name=LOG_CATEGORY_NAME)
-    if existing:
-        for ch in existing.channels:
-            await ch.delete()
-        await existing.delete()
-    if guild.id in log_channels:
-        del log_channels[guild.id]
-        save_data()
-    await _create_log_channels(ctx)
+    
+    if not existing or len(existing.channels) == 0:
+        await ctx.send("لا توجد رومات لوق لحذفها")
+        return
+
+    view = ConfirmResetView()
+    msg = await ctx.send("هل أنت متأكد من حذف جميع رومات اللوق؟", view=view)
+    await view.wait()
+
+    if view.value:
+        for ch in list(existing.channels):
+            try:
+                await ch.delete()
+            except Exception:
+                pass
+        try:
+            await existing.delete()
+        except Exception:
+            pass
+        if guild.id in log_channels:
+            del log_channels[guild.id]
+            save_data()
+        await _create_log_channels(ctx)
+    else:
+        await msg.edit(content="تم إلغاء طلب إعادة الضبط.", view=None)
 
 @log.command(name="set")
 @commands.has_permissions(administrator=True)
