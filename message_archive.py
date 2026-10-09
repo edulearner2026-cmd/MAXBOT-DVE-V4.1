@@ -80,7 +80,7 @@ def archive_message(message):
         conn.close()
         _cleanup_if_needed(message.guild.id if message.guild else 0)
     except Exception as e:
-        print(f"[ARCHIVE ERROR] {e}")
+        print(f"[ARCHIVE ERROR] {e}", flush=True)
 
 def _cleanup_if_needed(guild_id):
     if not guild_id:
@@ -96,8 +96,8 @@ def _cleanup_if_needed(guild_id):
             )
             conn.commit()
         conn.close()
-    except:
-        pass
+    except Exception as e:
+        print(f"[ARCHIVE CLEANUP ERROR] {e}")
 
 def search_messages(guild_id, author_id=None, channel_id=None, query=None, limit=20, offset=0):
     conn = get_connection()
@@ -110,9 +110,14 @@ def search_messages(guild_id, author_id=None, channel_id=None, query=None, limit
         parts.append("channel_id = ?")
         params.append(channel_id)
     if query:
-        parts.append("content LIKE ?")
-        params.append(f"%{query}%")
-    sql = f"SELECT * FROM messages WHERE {' AND '.join(parts)} ORDER BY timestamp DESC LIMIT ? OFFSET ?"
+        parts.append("content LIKE ? ESCAPE '\\'")
+        # Escape LIKE special characters to prevent wildcard injection
+        escaped_query = query.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        params.append(f"%{escaped_query}%")
+    # Clamp limit to prevent excessive queries
+    limit = max(1, min(int(limit), 100))
+    offset = max(0, int(offset))
+    sql = "SELECT * FROM messages WHERE " + " AND ".join(parts) + " ORDER BY timestamp DESC LIMIT ? OFFSET ?"
     params.extend([limit, offset])
     rows = conn.execute(sql, params).fetchall()
     conn.close()
@@ -128,7 +133,8 @@ def count_messages(guild_id, author_id=None, channel_id=None):
     if channel_id:
         parts.append("channel_id = ?")
         params.append(channel_id)
-    cnt = conn.execute(f"SELECT COUNT(*) FROM messages WHERE {' AND '.join(parts)}", params).fetchone()[0]
+    sql = "SELECT COUNT(*) FROM messages WHERE " + " AND ".join(parts)
+    cnt = conn.execute(sql, params).fetchone()[0]
     conn.close()
     return cnt
 

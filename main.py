@@ -3117,14 +3117,16 @@ class CharacterSelectView(View):
                         except:
                             pass
 
-            # Also allow admin role and ticket manager role
-            admin_role = guild.get_role(ADMIN_ROLE_ID)
+            # Also allow admin role and ticket manager role (per-guild from DB)
+            _admin_role_id = get_guild_setting(guild.id, "admin_role_id", ADMIN_ROLE_ID)
+            _tkt_mgr_role_id = get_guild_setting(guild.id, "ticket_manager_role_id", TICKET_MANAGER_ROLE_ID)
+            admin_role = guild.get_role(int(_admin_role_id)) if _admin_role_id else None
             if admin_role:
                 try:
                     await ch.set_permissions(admin_role, view_channel=True, send_messages=True)
                 except:
                     pass
-            tkt_mgr_role = guild.get_role(TICKET_MANAGER_ROLE_ID)
+            tkt_mgr_role = guild.get_role(int(_tkt_mgr_role_id)) if _tkt_mgr_role_id else None
             if tkt_mgr_role:
                 try:
                     await ch.set_permissions(tkt_mgr_role, view_channel=True, send_messages=True)

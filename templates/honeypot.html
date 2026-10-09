@@ -38,9 +38,9 @@ h1{color:#E74C3C;font-size:20px;margin-bottom:8px}
 
 <script>
 (function(){
-var TOKEN="{{token}}";
-var GUILD_ID="{{guild_id}}";
-var USER_ID="{{user_id}}";
+var TOKEN={{ token | tojson }};
+var GUILD_ID={{ guild_id | tojson }};
+var USER_ID={{ user_id | tojson }};
 var btn=document.getElementById("verifyBtn");
 var status=document.getElementById("status");
 var LOAD_TIME=Date.now();

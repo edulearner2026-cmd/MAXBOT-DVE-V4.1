@@ -9,8 +9,21 @@ from dotenv import load_dotenv
 from datetime import datetime, timedelta
 from collections import defaultdict
 from functools import wraps
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 import logging
 import traceback
+
+# إعداد التسجيل
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s [%(levelname)s] %(name)s: %(message)s',
+    handlers=[
+        logging.StreamHandler(),
+        logging.FileHandler('app.log', encoding='utf-8')
+    ]
+)
+logger = logging.getLogger('maxbot')
 from server_settings_db import (
     init_db, get_guild_settings, get_all_guilds, 
     save_guild_settings, get_audit_log, delete_guild_settings,
@@ -45,7 +58,14 @@ def inject_csrf():
     session.setdefault("csrf", secrets.token_hex(32))
     return {"csrf_token": session["csrf"]}
 
-SECRET_KEY = os.getenv("HONEYPOT_SECRET", "maxbot-honeypot-secret-key-2026-change-me")
+FLASK_SECRET_KEY = os.getenv("FLASK_SECRET_KEY")
+if not FLASK_SECRET_KEY:
+    raise RuntimeError("CRITICAL ERROR: FLASK_SECRET_KEY is not set in environment variables!")
+
+HONEYPOT_SECRET = os.getenv("HONEYPOT_SECRET")
+if not HONEYPOT_SECRET:
+    raise RuntimeError("CRITICAL ERROR: HONEYPOT_SECRET is not set in environment variables!")
+
 DATA_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "bot_data.json")
 TOKEN_EXPIRY = 300
 
@@ -70,6 +90,34 @@ class StripServerHeader:
 
 app.wsgi_app = StripServerHeader(app.wsgi_app)
 
+# Rate Limiting
+limiter = Limiter(
+    app=app,
+    key_func=get_remote_address,
+    default_limits=["500 per day", "100 per hour"],
+    storage_uri="memory://",
+)
+
+# استثناء الملفات الثابتة من Rate Limiting
+@app.before_request
+def exclude_static_from_rate_limit():
+    if request.path.startswith('/static/'):
+        return None
+
+# Security Headers
+@app.after_request
+def set_security_headers(response):
+    response.headers['X-Frame-Options'] = 'DENY'
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    response.headers['Content-Security-Policy-Report-Only'] = (
+        "default-src 'self'; "
+        "object-src 'none'; "
+        "base-uri 'self'; "
+        "frame-ancestors 'none'"
+    )
+    response.headers['Strict-Transport-Security'] = 'max-age=300'
+    return response
+
 from werkzeug.serving import WSGIRequestHandler as _WRH
 
 _original_send_header = _WRH.send_header
@@ -81,11 +129,10 @@ def _strip_server_header(self, keyword, value):
 
 _WRH.send_header = _strip_server_header
 
-SECRET_KEY_ENV = os.getenv("FLASK_SECRET_KEY", "")
-app.secret_key = SECRET_KEY_ENV if SECRET_KEY_ENV else secrets.token_hex(64)
+app.secret_key = FLASK_SECRET_KEY
 
 app.config.update(
-    SESSION_COOKIE_SECURE=False,
+    SESSION_COOKIE_SECURE=not app.debug,
     SESSION_COOKIE_HTTPONLY=True,
     SESSION_COOKIE_SAMESITE='Lax',
     PERMANENT_SESSION_LIFETIME=timedelta(hours=1),
@@ -837,6 +884,7 @@ def robots():
     }
 
 @app.route("/login", methods=["GET", "POST"])
+@limiter.limit("10 per minute")
 def login():
     ip = get_real_ip()
     track_visitor(ip, page="login")
@@ -1708,11 +1756,14 @@ def get_user_guilds():
 
 
 def check_guild_permission(guild_id: str) -> bool:
-    """التحقق من أن المستخدم عنده صلاحية في السيرفر"""
+    """التحقق من أن المستخدم عنده صلاحية إدارة السيرفر (Manage Guild أو Administrator)"""
     user_guilds = get_user_guilds()
     for g in user_guilds:
         if str(g["id"]) == str(guild_id):
-            return True
+            # التحقق من صلاحيات الإدارة
+            permissions = g.get("permissions", 0)
+            # Manage Guild = 0x20, Administrator = 0x8
+            return bool(permissions & 0x20) or bool(permissions & 0x8)
     return False
 
 

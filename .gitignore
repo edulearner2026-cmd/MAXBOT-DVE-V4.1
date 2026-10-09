@@ -43,5 +43,13 @@ commands_data.json
 server_url2.txt
 dashboard_cmd.txt
 
+# Secrets
+.env.local
+.env.production
+
+# Backups
+backups/
+*.bak
+
 # Node
 node_modules/
